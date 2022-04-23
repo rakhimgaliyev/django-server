@@ -1,0 +1,29 @@
+version: "3.8"
+services:
+  backend_diploma-web:
+    build: .
+    command: sh -c "./manage.py makemigrations && ./manage.py migrate && ./manage.py runserver 0.0.0.0:${BACKEND_DIPLOMA_PORT}"
+#    command: sh -c "./manage.py migrate && gunicorn notification.wsgi:application --bind 0.0.0.0:${NOTIFICATION_PORT}"
+    volumes:
+      - .:/backend_diploma
+    ports:
+      - ${BACKEND_DIPLOMA_PORT}:${BACKEND_DIPLOMA_PORT}
+    depends_on:
+      - backend_diploma-db
+    networks:
+      - backend_diploma-db-bridge
+
+  backend_diploma-db:
+    image: postgres:12.6
+    env_file:
+      - ./.db_credentials
+    ports:
+      - ${DB_SERVICE_PORT}:5432
+    volumes:
+      - ./backend_diploma_db:/var/lib/docker/volumes/
+    networks:
+      - backend_diploma-db-bridge
+
+networks:
+  backend_diploma-db-bridge:
+    driver: bridge
