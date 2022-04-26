@@ -267,7 +267,7 @@ def algos(templates):
 				'numberInClaster': i,
 				'numberOfClaster': jj,
 				'description': "",
-				'position': {'x': ans_path[i][0], y: ans_path[i][1]}
+				'position': {'x': ans_path[i][0], 'y': ans_path[i][1]}
 			})
 
 	return(result)
