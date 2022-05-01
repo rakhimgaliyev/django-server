@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view, renderer_classes
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
-from backend_diploma.models import Point, Position
+from backend_diploma.models import Point, Position, Data
 from backend_diploma.serializers import PointSerializer
 from utils.algos import algos
 
@@ -21,6 +21,11 @@ def create_map(request):
 
     for point in data:
         position = point['position']
+        clusters = point.get('clusters')
+        if clusters:
+            Data.objects.all().delete()
+            Data.objects.create(clusters=clusters)
+
         position_model = Position.objects.create(x=position['x'], y=position['y'])
 
         Point.objects.create(id=point['id'], description=point['description'], position=position_model)
@@ -50,4 +55,9 @@ def get_clusters(request):
     serializer = PointSerializer(Point.objects.all(), many=True)
 
     data = json.loads(json.dumps(serializer.data), object_hook=_decode)
+    clusters = Data.objects.first().clusters
+    data.append({
+        "clusters": clusters,
+    })
+
     return Response(algos(data))

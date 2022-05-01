@@ -12,5 +12,7 @@ class Point(models.Model):
     position = models.OneToOneField(Position, on_delete=models.CASCADE, primary_key=True)
 
 
+class Data(models.Model):
+    clusters = models.IntegerField()
 
 

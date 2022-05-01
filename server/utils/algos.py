@@ -1,273 +1,157 @@
-import json
+import osmnx as ox
+import networkx as nx
+import numpy as np
 import copy
-from haversine import haversine
+import json
+import numpy as np
+from python_tsp.exact import solve_tsp_dynamic_programming
+from sklearn.cluster import SpectralClustering
+from math import sin, cos, sqrt, radians, atan2
 
 
-def _dist(a, b):
-	a = (a[0], a[1])
-	b = (b[0], b[1])
-	# print(haversine(a, b))
-	return haversine(a, b)
-
-
-def _data_distribution(array, cluster):
-	k = len(cluster)
-	n = len(array)
-	dim = 2
-
-	cluster_content = [[] for i in range(k)]
-
-	for i in range(n):
-		min_distance = float('inf')
-		situable_cluster = -1
-		for j in range(k):
-			# distance = _dist(array[i], cluster[j])
-			distance = 0
-			for q in range(dim):
-				distance += (array[i][q] - cluster[j][q]) ** 2
-
-			distance = distance ** (1 / 2)
-			if distance < min_distance:
-				min_distance = distance
-				situable_cluster = j
-
-		cluster_content[situable_cluster].append(array[i])
-
-	return cluster_content
-
-
-def cluster_update(cluster, cluster_content, dim):
-	k = len(cluster)
-	for i in range(k): #по i кластерам
-		for q in range(dim): #по q параметрам
-			updated_parameter = 0
-			for j in range(len(cluster_content[i])):
-				updated_parameter += cluster_content[i][j][q]
-			if len(cluster_content[i]) != 0:
-				updated_parameter = updated_parameter / len(cluster_content[i])
-			cluster[i][q] = updated_parameter
-	return cluster
-
-
-def clusterization(array, k):
-	n = len(array)
-	dim = len(array[0])
-
-	cluster = [[0 for i in range(dim)] for q in range(k)]
-	cluster_content = [[] for i in range(k)]
-
-	# for i in range(dim):
-	# 	for q in range(k):
-	# 		# a = array[0][0]
-	# 		# b = array[0][1]
-	# 		# print(a, b)
-	# 		# if a > b:
-	# 		# 	a, b = b, a
-	# 		cluster[q][i] = random.randint()
-	for q in range(k):
-		cluster[q] = array[q]
-
-	cluster_content = _data_distribution(array, cluster)
-
-	privious_cluster = copy.deepcopy(cluster)
-	while 1:
-		cluster = cluster_update(cluster, cluster_content, dim)
-		cluster_content = _data_distribution(array, cluster)
-		if cluster == privious_cluster:
-			break
-		privious_cluster = copy.deepcopy(cluster)
-
-	return cluster_content
-
-
-#Функция нахождения минимального элемента, исключая текущий элемент
-def Min(lst, myindex):
+def Min(lst,myindex):
     return min(x for idx, x in enumerate(lst) if idx != myindex)
 
-
 #функция удаления нужной строки и столбцах
-def _Delete(matrix, index1, index2):
+def Delete(matrix,index1,index2):
     del matrix[index1]
     for i in matrix:
         del i[index2]
     return matrix
 
 
-def _Komi(matrix):
-	n = len(matrix)
-	# matrix = []
-	H = 0
-	PathLenght = 0
-	Str = []
-	Stb = []
-	res = []
-	result = []
-	StartMatrix = []
+def get_dist(coos1, coors2):
+    R = 6373.0
+    lat1 = radians(coos1[0])
+    lon1 = radians(coos1[1])
+    lat2 = radians(coors2[0])
+    lon2 = radians(coors2[1])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
 
-	# Инициализируем массивы для сохранения индексов
-	for i in range(n):
-		Str.append(i)
-		Stb.append(i)
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    distance = R * c
 
-	# Вводим матрицу
-	# for i in range(n): matrix.append(list(map(int, input().split())))
-
-	# Сохраняем изначальную матрицу
-	for i in range(n): StartMatrix.append(matrix[i].copy())
-
-	# Присваеваем главной диагонали float(inf)
-	for i in range(n): matrix[i][i] = float('inf')
-
-	while True:
-		# Редуцируем
-		# --------------------------------------
-		# Вычитаем минимальный элемент в строках
-		for i in range(len(matrix)):
-			temp = min(matrix[i])
-			H += temp
-			for j in range(len(matrix)):
-				matrix[i][j] -= temp
-
-		# Вычитаем минимальный элемент в столбцах
-		for i in range(len(matrix)):
-			temp = min(row[i] for row in matrix)
-			H += temp
-			for j in range(len(matrix)):
-				matrix[j][i] -= temp
-		# --------------------------------------
-
-		# Оцениваем нулевые клетки и ищем нулевую клетку с максимальной оценкой
-		# --------------------------------------
-		NullMax = 0
-		index1 = 0
-		index2 = 0
-		tmp = 0
-		for i in range(len(matrix)):
-			for j in range(len(matrix)):
-				if matrix[i][j] == 0:
-					tmp = Min(matrix[i], j) + Min((row[j] for row in matrix), i)
-					if tmp >= NullMax:
-						NullMax = tmp
-						index1 = i
-						index2 = j
-		# --------------------------------------
-
-		# Находим нужный нам путь, записываем его в res и удаляем все ненужное
-		res.append(Str[index1] + 1)
-		res.append(Stb[index2] + 1)
-
-		oldIndex1 = Str[index1]
-		oldIndex2 = Stb[index2]
-		if oldIndex2 in Str and oldIndex1 in Stb:
-			NewIndex1 = Str.index(oldIndex2)
-			NewIndex2 = Stb.index(oldIndex1)
-			matrix[NewIndex1][NewIndex2] = float('inf')
-		del Str[index1]
-		del Stb[index2]
-		matrix = _Delete(matrix, index1, index2)
-		if len(matrix) == 1: break
-
-	# Формируем порядок пути
-	# print("res", len(res))
-	# print(res)
-	for i in range(0, len(res) - 1, 2):
-		if res.count(res[i]) < 2:
-			result.append(res[i])
-			result.append(res[i + 1])
-	for i in range(0, len(res) - 1, 2):
-		for j in range(0, len(res) - 1, 2):
-			if result[len(result) - 1] == res[j]:
-				result.append(res[j])
-				result.append(res[j + 1])
-	# print("----------------------------------")
-	# print(result)
-
-	# Считаем длину пути
-	for i in range(0, len(result) - 1, 2):
-		if i == len(result) - 2:
-			PathLenght += StartMatrix[result[i] - 1][result[i + 1] - 1]
-			PathLenght += StartMatrix[result[i + 1] - 1][result[0] - 1]
-		else:
-			PathLenght += StartMatrix[result[i] - 1][result[i + 1] - 1]
-	# print(PathLenght)
-	# print("----------------------------------")
-	return result
+    return distance
 
 
-def algos(templates):
-	start = templates[0]
-	st_x = start['position']['x']
-	st_y = start['position']['y']
-	st = [st_x, st_y]
-	templates = templates[1:]
 
-	# print(len(templates))
-	m = dict()
-	a = []
-	X = []
-	Y = []
-	for i in templates:
-		x = i['position']['x']
-		y = i['position']['y']
-		X.append(x)
-		Y.append(y)
-		m[(x, y)] = i['id']
-		a.append([x, y])
+def get_shortest_path(G, orig=[59.9454552627266, 30.265246173508295],
+                      dest=[59.9280917384679, 30.290336197625937]):
+    R = 6373.0
 
-	# количество кластеров
-	kol_kl = 2
-	res = clusterization(a, kol_kl)
+    # ox.config(use_cache=True, log_console=True)
 
-	result = [[] for i in range(kol_kl)]
-	jj = -1
+    # define the place query
+    # query = {'city': 'Saint-Petersburg'}
 
-	for k in res:
-		jj += 1
-		n = len(k)
-		matrix = [[0] * n for i in range(n)]
-		for i in range(n):
-			for j in range(n):
-				if i != j:
-					matrix[i][j] = _dist(k[i], k[j])
+    # G = ox.graph_from_place(query, network_type='drive')
 
-		# print("klast", k)
-		res = _Komi(matrix)
-		path = [k[res[0]-1]]
-		for i in range(1, len(res)):
-			if res[i] != res[i-1]:
-				path.append(k[res[i]-1])
+    orig_id = ox.distance.get_nearest_node(G, orig)
+    dest_id = ox.distance.get_nearest_node(G, dest)
 
-		# print(path)
-		mi = 10**10
-		mi_i = -1
-		for i in range(len(path)):
-			mi_di = _dist(st, path[i])
-			if mi_di < mi:
-				mi = mi_di
-				mi_i = i
+    shortest_path_ids = nx.shortest_path(G, orig_id, dest_id)
+    shortest_path_coors = [orig]
+    for node in shortest_path_ids:
+        shortest_path_coors.append([G.nodes[node]['y'], G.nodes[node]['x']])
+    shortest_path_coors.append(dest)
+    distance = 0
 
-		ans_path = []
-		i = mi_i
-		while(i < len(path)):
-			ans_path.append(path[i])
-			i += 1
+    for i in range(len(shortest_path_coors)-1):
+        distance += get_dist(shortest_path_coors[i], shortest_path_coors[i+1])
 
-		i = 0
-		while(i < mi_i):
-			ans_path.append(path[i])
-			i += 1
+    return shortest_path_coors, distance
 
-		ans_path.append(ans_path[0])
 
-		for i in range(0, len(ans_path)):
-			x = ans_path[i][0]
-			y = ans_path[i][1]
-			result[jj].append({
-				# 'id': 0, # m[(x, y)],
-				'numberInClaster': i,
-				'numberOfClaster': jj,
-				'description': "",
-				'position': {'x': ans_path[i][0], 'y': ans_path[i][1]}
-			})
+def clustering(coors:dict):  
+    query = {'city': 'Saint-Petersburg'}
 
-	return(result)
+    G = ox.graph_from_place(query, network_type='drive')
+
+    for c in coors:
+        if 'clusters' in c.keys():
+            clusters = c['clusters']
+
+    points = {}
+    for data in coors:
+        if 'id' in sorted(data.keys()):
+            points[data['id']] = [data['position']['x'], data['position']['y']]
+
+    keys_of_points = sorted(points.keys())
+    ln_points = len(keys_of_points)
+    matrix_of_dist = np.zeros((ln_points, ln_points))
+    for row in range(ln_points):
+        for col in range(ln_points):
+            if row == col:
+                matrix_of_dist[row, col] = 0
+            else:
+                _, matrix_of_dist[row, col] = \
+                    get_shortest_path(G, points[keys_of_points[row]], points[keys_of_points[col]])
+
+    clustering = SpectralClustering(n_clusters=clusters,  assign_labels='discretize', \
+                                          random_state=0).fit(matrix_of_dist)
+    
+    matching_c = {x: y for x, y in zip(keys_of_points[1:], clustering.labels_[1:])}
+    result = []
+    for c in range(clusters):
+        result.append([])
+        for k, v in matching_c.items():
+            if v == c:
+                result[c].append(k)
+
+    return result, matrix_of_dist.tolist(), keys_of_points
+
+
+def com(clusters:list, matrix:np.array, keys_of_points:list, coors:dict):
+    final_result = []
+    for cluster in clusters:
+        matrix_cluster = copy.deepcopy(matrix)
+        inds = []
+        for point in cluster:
+            inds.append(keys_of_points.index(point))
+        # print(f'points index: {inds}')
+        # print(f'cluser: {cluster}')
+
+        # print(f'len: {len(keys_of_points)}')
+        for i in range(len(keys_of_points)-1, 0, -1):
+            # print(i)
+            # print(keys_of_points[i])
+            if keys_of_points[i] not in inds:
+                # print('YEEEEP')
+                matrix_cluster = Delete(matrix_cluster, keys_of_points[i], keys_of_points[i])
+
+        # for i in range(len(matrix_cluster[0])): 
+        #     matrix_cluster[i][i]=float('inf')
+        permutation, distance = solve_tsp_dynamic_programming(np.asarray(matrix_cluster))
+        final_result.append((inds, permutation))
+    out_data = []
+    for k in final_result:
+        dict_out = {}
+        for ind1, ind2 in zip(k[0], k[1]):
+            dict_out[ind1] = ind2
+        out_data.append(dict_out)
+    return out_data
+
+
+def algos(json_in):
+    # json_in = json.load(open('dataset2.json'))
+    clusters, matrix, keys = clustering(json_in)
+    commi = com(clusters, matrix, keys, json_in)
+    # print(commi)
+    k = -1
+    json_out = []
+    for cl in commi:
+        k += 1
+        for key in cl:
+            for d in json_in:
+                if d['id'] == key:
+                    d['numberOfClaster'] = k
+                    d['numberInClaster'] = cl[key]
+                    json_out.append(d)
+                    break
+    for d in json_in:
+        if d['id'] == 0:
+            json_out.append(d)
+            break    
+    return json_out
